@@ -10,6 +10,12 @@
 #include "intersection_time.h"
 #include "input.h"
 
+#include <time.h>
+
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME 0
+#endif
+
 /* 
  * curr_arrivals[][][]
  *
@@ -28,6 +34,20 @@ static Arrival curr_arrivals[4][4][20];
  * The two indices determine the entry lane: first index is Side, second index is Direction
  */
 static sem_t semaphores[4][4];
+
+/**
+ * ts
+ *
+ * A struct that defines the timeout for the semaphore
+ */
+struct timespec ts;
+
+/**
+ * mutex
+ *
+ * A single mutex to lock the semaphores
+ */
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
  * supply_arrivals()
@@ -58,7 +78,6 @@ static void* supply_arrivals()
   return(0);
 }
 
-
 /*
  * manage_light(void* arg)
  *
@@ -66,7 +85,64 @@ static void* supply_arrivals()
  */
 static void* manage_light(void* arg)
 {
-  // TODO:
+  // Get the number of the traffic light
+  int num = *(int*)arg;
+  free(arg);
+
+  // From the given number, determine the side and direction
+  int side;
+  int direction;
+
+  if (num < 6) 
+  {
+    side = (num / 3) + 1;
+    direction = num % 3;
+  } else if (num == 6)
+  {
+    side = 2;
+    direction = 3;
+  } else if (num > 6) 
+  {
+    side = ((num - 1) / 3) + 1;
+    direction = (num - 1) % 3;
+  }
+
+  // Wait for the first arrival
+  while(1)
+  {
+    int result = sem_timedwait(&semaphores[side][direction], &ts);
+    if (result == -1 && errno == ETIMEDOUT)
+    {
+      // Exit when time is up
+      return 0;
+    }
+    else
+    {
+      // Get last car that has arrived at the traffic light
+      int nrCars = 0;
+      for (int i = 0; i < 20; i++)
+      {
+        if (curr_arrivals[side][direction][i].id != 0)
+        {
+          nrCars++;
+        }
+      }
+
+      // Claim the mutex
+      pthread_mutex_lock(&mutex);
+      // Turn traffic light green
+      printf("traffic light %d %d turns green at time %d for car %d\n",
+       side, direction, get_time_passed(), curr_arrivals[side][direction][nrCars - 1].id);
+      // Sleep
+      sleep(CROSS_TIME);
+      // Turn traffic light red
+      printf("traffic light %d %d turns red at time %d\n", side, direction, get_time_passed());
+      // Release the mutex
+      pthread_mutex_unlock(&mutex);
+    }
+  }
+
+  // TODO: (DONE)
   // while not all arrivals have been handled, repeatedly:
   //  - wait for an arrival using the semaphore for this traffic light
   //  - lock the right mutex(es)
@@ -94,10 +170,29 @@ int main(int argc, char * argv[])
   start_time();
   
   // TODO: create a thread per traffic light that executes manage_light
+  pthread_t traffic_lights[10];
+
+  // set the end time
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += END_TIME - get_time_passed();
+
+  for (int i = 0; i < 10; i++)
+  {
+    int * num = malloc(sizeof(int));
+    *num = i;
+    pthread_create(&traffic_lights[i], NULL, manage_light, num);
+  }
 
   // TODO: create a thread that executes supply_arrivals
+  pthread_t arrivals_thread;
+  pthread_create(&arrivals_thread, NULL, supply_arrivals, NULL);
 
   // TODO: wait for all threads to finish
+  for (int i = 0; i < 10; i++)
+  {
+    pthread_join(traffic_lights[i], NULL);
+  }
+  pthread_join(arrivals_thread, NULL);
 
   // destroy semaphores
   for (int i = 0; i < 4; i++)
