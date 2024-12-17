@@ -10,7 +10,6 @@
 #include "intersection_time.h"
 #include "input.h"
 
-#include <time.h>
 
 
 #ifndef CLOCK_REALTIME
@@ -18,6 +17,7 @@
 #endif
 
 
+// Handles the turning on and off of the traffic light
 static void lighthandler(int side, int directionm, Arrival current_car);
 
 
@@ -58,7 +58,7 @@ static pthread_mutex_t mutex4;
 static pthread_mutex_t mutex5;
 static pthread_mutex_t mutex6;
 static pthread_mutex_t mutex7;
-static pthread_mutex_t mutex8;
+
 
 
 /*
@@ -118,8 +118,10 @@ static void* manage_light(void* arg)
     side = ((num - 1) / 3) + 1;
     direction = (num - 1) % 3;
   }
+
   // Track the next car to be processed for this light
   int next_car_index = 0;
+
   // Wait for the first arrival
   while(1)
   {
@@ -150,8 +152,7 @@ static void* manage_light(void* arg)
             required_mutexes[0] = &mutex2;
             required_mutexes[1] = &mutex3;
             required_mutexes[2] = &mutex7;
-            required_mutexes[3] = &mutex8;
-            mutex_count = 4;
+            mutex_count = 3;
         } else if (side == 2 && direction == 2) {
             required_mutexes[0] = &mutex1;
             mutex_count = 1;
@@ -163,8 +164,7 @@ static void* manage_light(void* arg)
         } else if (side == 2 && direction == 0) {
             required_mutexes[0] = &mutex2;
             required_mutexes[1] = &mutex6;
-            required_mutexes[2] = &mutex8;
-            mutex_count = 3;
+            mutex_count = 2;
         } else if (side == 2 && direction == 3) {
             required_mutexes[0] = &mutex7;
             mutex_count = 1;
@@ -207,22 +207,13 @@ static void* manage_light(void* arg)
                 usleep(100);
             }
         }
+
    lighthandler(side, direction, current_car);
   
    for (int i = 0; i < mutex_count; i++) {
             pthread_mutex_unlock(required_mutexes[i]);
         }
 
-
-  // TODO: (DONE)
-  // while not all arrivals have been handled, repeatedly:
-  //  - wait for an arrival using the semaphore for this traffic light
-  //  - lock the right mutex(es)
-  //  - make the traffic light turn green
-  //  - sleep for CROSS_TIME seconds
-  //  - make the traffic light turn red
-  //  - unlock the right mutex(es)
-    
   }
   return(0);
 }
@@ -256,7 +247,6 @@ int main(int argc, char * argv[])
   // start the timer
   start_time();
   
-  // TODO: create a thread per traffic light that executes manage_light
   pthread_t traffic_lights[10];
 
   // set the end time
@@ -270,11 +260,10 @@ int main(int argc, char * argv[])
     pthread_create(&traffic_lights[i], NULL, manage_light, num);
   }
 
-  // TODO: create a thread that executes supply_arrivals
   pthread_t arrivals_thread;
   pthread_create(&arrivals_thread, NULL, supply_arrivals, NULL);
 
-  // TODO: wait for all threads to finish
+ // wait for all threads to finish
   for (int i = 0; i < 10; i++)
   {
     pthread_join(traffic_lights[i], NULL);
