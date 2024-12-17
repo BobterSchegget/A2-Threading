@@ -89,6 +89,9 @@ static void* manage_light(void* arg)
   int num = *(int*)arg;
   free(arg);
 
+  // Track the next car to be processed for this light
+  int next_car_index = 0;
+  
   // From the given number, determine the side and direction
   int side;
   int direction;
@@ -116,23 +119,16 @@ static void* manage_light(void* arg)
       // Exit when time is up
       return 0;
     }
-    else
-    {
-      // Get last car that has arrived at the traffic light
-      int nrCars = 0;
-      for (int i = 0; i < 20; i++)
-      {
-        if (curr_arrivals[side][direction][i].id != 0)
-        {
-          nrCars++;
-        }
-      }
-
+    // get current car
+    Arrival current_car = curr_arrivals[side][direction][next_car_index];
+    next_car_index++;
+ 
+     
       // Claim the mutex
       pthread_mutex_lock(&mutex);
       // Turn traffic light green
       printf("traffic light %d %d turns green at time %d for car %d\n",
-       side, direction, get_time_passed(), curr_arrivals[side][direction][nrCars - 1].id);
+       side, direction, get_time_passed(), current_car.id);
       // Sleep
       sleep(CROSS_TIME);
       // Turn traffic light red
@@ -140,7 +136,7 @@ static void* manage_light(void* arg)
       // Release the mutex
       pthread_mutex_unlock(&mutex);
     }
-  }
+  
   return(0);
 }
 
