@@ -141,16 +141,6 @@ static void* manage_light(void* arg)
       pthread_mutex_unlock(&mutex);
     }
   }
-
-  // TODO: (DONE)
-  // while not all arrivals have been handled, repeatedly:
-  //  - wait for an arrival using the semaphore for this traffic light
-  //  - lock the right mutex(es)
-  //  - make the traffic light turn green
-  //  - sleep for CROSS_TIME seconds
-  //  - make the traffic light turn red
-  //  - unlock the right mutex(es)
-
   return(0);
 }
 
@@ -169,7 +159,6 @@ int main(int argc, char * argv[])
   // start the timer
   start_time();
   
-  // TODO: create a thread per traffic light that executes manage_light
   pthread_t traffic_lights[10];
 
   // set the end time
@@ -182,12 +171,10 @@ int main(int argc, char * argv[])
     *num = i;
     pthread_create(&traffic_lights[i], NULL, manage_light, num);
   }
-
-  // TODO: create a thread that executes supply_arrivals
+  
   pthread_t arrivals_thread;
   pthread_create(&arrivals_thread, NULL, supply_arrivals, NULL);
 
-  // TODO: wait for all threads to finish
   for (int i = 0; i < 10; i++)
   {
     pthread_join(traffic_lights[i], NULL);
